@@ -5,7 +5,7 @@
 #include "sort_absorb_last.h"
 
 int main() {
-  long n_particles = 102;
+  long n_particles = 20;
   long n_buffer = n_particles;
   _class_particle * particles = calloc(n_particles, sizeof(_class_particle));
   _class_particle * buffer = calloc(n_buffer, sizeof(_class_particle));
@@ -32,6 +32,11 @@ int main() {
     particles[i].randstate[6] = (double) i;
   }
   long weight;
+  printf("Pre sorted\n");
+  for (long i=0; i < n_particles; i++){
+    printf("Particle %ld: x=%f, _absorbed=%d, rand=%f\n", i, particles[i].x, particles[i]._absorbed, particles[i].randstate[0]);
+  }
+
   long returned = sort_absorb_last(particles, n_particles, buffer, n_buffer, 1, &weight);
 
   printf("Returned %ld particles with weight %ld\n", returned, weight);
