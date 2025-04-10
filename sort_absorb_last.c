@@ -172,7 +172,6 @@ long sort_absorb_list(particle_node * input, long len, long * multiplier){
 #pragma acc parallel loop present(input[0:len], bad[0:SAL_THREADS], good[0:SAL_THREADS])
     for (long thread=0; thread < SAL_THREADS; thread++) {
       for (long i=0; i < (thread <= remainder ? at_least + 1 : at_least); ++i){
-        printf("Thread %ld, i %ld\n", thread, i);
         particle_node_copy(bad[thread], good[thread], 0); // don't copy the rand state from good to bad
         bad[thread] = bad[thread]->next;
         good[thread] = good[thread]->next;

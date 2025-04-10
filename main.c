@@ -6,10 +6,7 @@
 
 int main() {
   long n_particles = 20;
-  long n_buffer = n_particles;
   _class_particle * particles = calloc(n_particles, sizeof(_class_particle));
-  _class_particle * buffer = calloc(n_buffer, sizeof(_class_particle));
-
   particle_node * good = calloc(n_particles, sizeof(particle_node));
 
   for (long i=0; i < n_particles; i++){
@@ -56,9 +53,13 @@ int main() {
     printf("Particle %ld: x=%f, _absorbed=%d, rand=%f\n", i, particles[i].x, particles[i]._absorbed, particles[i].randstate[0]);
   }
 
-  free(particles);
-  free(buffer);
+  // pretend we're going on with this linked list scheme, so de-tangle the particle list:
+  for (long i=0; i < n_particles; i++){
+    good[i].prev = i ? NULL : good + i - 1;
+    good[i].next = i < n_particles - 1 ? good + i + 1 : NULL;
+  }
 
+  free(particles);
   free(good);
   return 0;
 }
