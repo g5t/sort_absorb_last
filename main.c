@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
   // Start with all particles in 'good' list because they just passed through a component
   for (long i=0; i < n_particles; i++){
     good[i].this = particles + i;
-    good[i].prev = i ? NULL : good + i - 1;
+    good[i].prev = i == 0 ? NULL : good + i - 1;
     good[i].next = i < n_particles - 1 ? good + i + 1 : NULL;
   }
   // Set up the offsets for the good list
