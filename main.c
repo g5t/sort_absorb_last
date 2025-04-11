@@ -95,8 +95,7 @@ int main(int argc, char *argv[]) {
 
   // pretend we're going on with this linked list scheme, so de-tangle the particle list:
   for (long i=0; i < n_particles; i++){
-    good[i].prev = i ? NULL : good + i - 1;
-    good[i].next = i < n_particles - 1 ? good + i + 1 : NULL;
+    good[i].prev = i > 0 ? good + i - 1 : NULL;
   }
 
   free(particles);
