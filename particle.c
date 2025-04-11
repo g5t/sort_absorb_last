@@ -112,7 +112,7 @@ particle_node * particle_list_rewind(particle_node * nodes){
     particle_node * remove = nodes;
     nodes = nodes->prev;
     free(remove);
-    nodes->next = NULL;;
+    nodes->next = NULL;
   }
   while (nodes != NULL && nodes->prev != NULL) {
     nodes = nodes->prev;
