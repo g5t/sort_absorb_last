@@ -3,107 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "sort_absorb_last.h"
+#define SAL_THREADS 1 // num parallel sections
 
-
-long sort_absorb_list(particle_node * input, long len, long * multiplier){
-#define SAL_THREADS 3 // num parallel sections
-
-  if (multiplier != NULL) *multiplier = -1; // set default out value for multiplier
-
-  long at_least = len / SAL_THREADS;  // every thread handles at least this many particles
-  long remainder = len % SAL_THREADS; // and the first remainder threads handle one more
-
-  particle_node * good[SAL_THREADS];
-  particle_node * bad[SAL_THREADS];
-  particle_node * start[SAL_THREADS];
-
-  // identify per-thread starting points before sorting, since this method breaks once ->next is modified
-  for (long thread = 0; thread < SAL_THREADS; ++thread) {
-    long chunk = thread <= remainder ? at_least + 1 : at_least;
-    long first = (chunk * thread) + (thread <= remainder ? 0 : remainder);
-    start[thread] = particle_list_after(input, first); // input + first
-    good[thread] = NULL;
-    bad[thread] = NULL;
-  }
-
-  for (long thread = 0; thread < SAL_THREADS; ++thread){
-    long chunk = thread <= remainder ? at_least + 1 : at_least;
-    particle_node * node = start[thread];
-    if (node == NULL || node->this == NULL) continue;
-    // ensure the ->prev link in removed
-    node->prev = NULL;
-    particle_node * move;
-    for (long i = 0; i < chunk; ++i){
-      if (node == NULL || node->this == NULL) break;
-      int absorbed = node->this->_absorbed;
-      move = absorbed ? bad[thread] : good[thread];
-      if (move != NULL){
-        // add to the end of the list
-        move->next = node;
-        node->prev = move;
-      } else {
-        // this is the first node in the good/bad list
-        node->prev = NULL;
-      }
-      if (absorbed){
-        bad[thread] = node;
-      } else {
-        good[thread] = node;
-      }
-      // store the last node in the good/bad list
-      move = node;
-      // move the pointer for the input list
-      node = node->next;
-      // unlink the good/bad list end node
-      move->next = NULL;
-    }
-    // go back to the start of this thread's list
-    good[thread] = particle_list_rewind(good[thread]);
-    bad[thread] = particle_list_rewind(bad[thread]);
-  }
-  // identify the first thread to have found a good particle
-  // TODO Since we're modifying the pointers in the input list, we should not create a loop
-  //      otherwise we may have trouble 'straightening' the list later.
-  long total_good = connect_particle_lists(good, SAL_THREADS, 1); // *do not* loop the good list
-  long total_bad = connect_particle_lists(bad, SAL_THREADS, 0); // don't loop the bad list
-
-  if (total_good && total_bad){
-    // with finite good and bad, we have work to do.
-    // parallelize over the number of threads, each needs to fill-in total_bad / SAL_THREADS
-    at_least = total_bad / SAL_THREADS;
-    remainder = total_bad % SAL_THREADS;
-    // move the pointers to their per-thread offsets
-    for (long i=1; i<SAL_THREADS; i++) {
-      bad[i] = particle_list_after(bad[i-1], i <= remainder ? at_least + 1 : at_least);
-      // good might loop-around, this is fine.
-      good[i] = particle_list_after(good[i-1], i <= remainder ? at_least + 1 : at_least);
-    }
-    // overwrite the bad list with the good list
-#pragma acc parallel loop present(input[0:len], bad[0:SAL_THREADS], good[0:SAL_THREADS])
-    for (long thread=0; thread < SAL_THREADS; thread++) {
-      for (long i=0; i < (thread <= remainder ? at_least + 1 : at_least); ++i){
-        particle_node_copy(bad[thread], good[thread], 0); // don't copy the rand state from good to bad
-        bad[thread] = bad[thread]->next;
-        good[thread] = good[thread]->next;
-      }
-    }
-  }
-
-  if (total_good && multiplier){
-    // if we have good particles, we need to return the multiplier
-    // which is how much we've scaled up the good particles
-    *multiplier = 1 + total_bad / total_good;
-  }
-
-  // if there were any good particles, we have ensured there are len good ones output
-  return total_good ? len : 0;
-}
-
-long chunk_size(long len, long threads, long thread){
-  long at_least = len / threads;  // every thread handles at least this many particles
-  long remainder = len % threads; // and the first remainder threads handle one more
-  return thread < remainder ? at_least + 1 : at_least;
-}
 
 long chunk_start(long len, long threads, long thread){
   long at_least = len / threads;  // every thread handles at least this many particles
@@ -113,7 +14,6 @@ long chunk_start(long len, long threads, long thread){
 
 
 long sort_absorb_offset(_class_particle * particles, long * nexts, long len, long * multiplier){
-#define SAL_THREADS 3 // num parallel sections
 
   if (multiplier != NULL) *multiplier = -1; // set default out value for multiplier
 
@@ -140,7 +40,6 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
     first_bad[thread] = len + 1;
     good[thread] = len + 1;
     bad[thread] = len + 1;
-    printf("thread=%ld, first_index=%ld\n", thread, first_index[thread]);
   }
 
   for (long thread = 0; thread < SAL_THREADS; ++thread) {
@@ -172,7 +71,6 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
   long total_good = connect_particle_nodes(good, nexts, len, SAL_THREADS, 1);
   long total_bad = connect_particle_nodes(bad, nexts, len, SAL_THREADS, 0);
 
-  printf("total_good=%ld, total_bad=%ld\n", total_good, total_bad);
 
   if (!(total_good && total_bad)){
     return total_good;
@@ -192,7 +90,7 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
   }
 
   // overwrite the bad list with the good list
-#pragma acc parallel loop present(particles[0:len], offsets[0:len], bad[0:SAL_THREADS], good[0:SAL_THREADS])
+#pragma acc parallel loop present(particles[0:len], bad[0:SAL_THREADS], good[0:SAL_THREADS])
   for (long thread=0; thread < SAL_THREADS; thread++) {
     long chunk = thread < remainder ? at_least + 1 : at_least;
     for (long i=0; i < chunk; ++i){
@@ -228,18 +126,124 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
 
 
 
+long separate_soa(_class_particle_soa * particles, long * left_start, long * left_total, long * right_start, long * right_total, int connect_left, int connect_right){
+
+  long left[SAL_THREADS];
+  long right[SAL_THREADS];
+  long len = particles->n_particles;
+  long * next = particles->next;
+  int * is_right = particles->_absorbed;
+
+//#pragma acc parallel loop present(next[0:len], is_right[0:len], left[0:SAL_THREADS], right[0:SAL_THREADS])
+  for (long thread=0; thread < SAL_THREADS; ++thread){
+    left[thread] = len + 1;
+    right[thread] = len + 1;
+    long left_head = len + 1;
+    long right_head = len + 1;
+    long start = chunk_start(len, SAL_THREADS, thread);
+    long end = chunk_start(len, SAL_THREADS, thread + 1);
+    for (long i=start; i < end && i < len; ++i){
+      int isr = is_right[i];
+      if ((isr ? right_head : left_head) < len) {
+        next[isr ? right_head : left_head] = i; // from the head of the left|right list next points to the current index
+      } else {
+        if (isr){ right[thread] = i; } else { left[thread] = i; }
+      }
+      // move the left or right head to be this particle
+      if (isr){ right_head = i; } else { left_head = i; }
+      next[i] = len + 1; // disconnect this particle from the next list
+    }
+  }
+
+  long tl = connect_particle_nodes(left, next, len, SAL_THREADS, connect_left);
+  long tr = connect_particle_nodes(right, next, len, SAL_THREADS, connect_right);
+
+  if (left_total) *left_total = tl;
+  if (right_total) *right_total = tr;
+  if (left_start) *left_start = left[0];
+  if (right_start) *right_start = right[0];
+  return tl + tr;
+}
+
+
+long sort_absorb_soa(_class_particle_soa * particles, long * multiplier){
+  if (multiplier != NULL) *multiplier = -1; // set default out value for multiplier
+  long left_start, right_start, left_total, right_total;
+//  long total = separate_soa(particles, &left_start, &left_total, &right_start, &right_total, 1, 0);
+  long total = separate_soa_single(particles, &left_start, &left_total, &right_start, &right_total, 1, 0);
+  if (!total){
+    return right_total;
+  }
+  if (multiplier){
+    *multiplier = 1 + right_total / left_total;
+  }
+  long len = particles->n_particles;
+  // with finite good and bad, we have work to do.
+  // parallelize over the number of threads, each needs to fill-in total_bad / SAL_THREADS
+  long at_least = right_total / SAL_THREADS;  // every thread handles at least this many particles
+  long remainder = right_total % SAL_THREADS; // and the first remainder threads handle one more
+  long left[SAL_THREADS];
+  long right[SAL_THREADS];
+  left[0] = left_start;
+  right[0] = right_start;
+  // move the pointers to their per-thread offsets
+  for (long i=1; i<SAL_THREADS; i++) {
+    long chunk = i - 1 < remainder ? at_least + 1 : at_least;
+    left[i] = particle_node_after(left[i-1], particles->next, len, chunk);
+    right[i] = particle_node_after(right[i-1], particles->next, len, chunk);
+  }
+
+  // overwrite the right list with the left list
+//#pragma acc parallel loop present(particles[0:len], left[0:SAL_THREADS], right[0:SAL_THREADS])
+  for (long thread=0; thread < SAL_THREADS; ++thread){
+    long chunk = thread < remainder ? at_least + 1 : at_least;
+    for (long i=0; i < chunk; ++i){
+      // copy the good particle to the bad list but don't copy it's randstate
+      particle_soa_duplicate_one(particles, right[thread], particles, left[thread], 0, 0);
+      // move the pointers
+      right[thread] = particles->next[right[thread]];
+      left[thread] = particles->next[left[thread]];
+    }
+  }
+  // we overwrote any bad particles, so we return the total number, always.
+  return len;
+}
 
 
 
 
 
+long separate_soa_single(_class_particle_soa * particles, long * left_start, long * left_total, long * right_start, long * right_total, int connect_left, int connect_right){
+  long len = particles->n_particles;
+  long * next = particles->next;
+  int * is_right = particles->_absorbed;
 
+  long left = len + 1;
+  long right = len + 1;
+  long left_head = len + 1;
+  long right_head = len + 1;
+  for (long i=0; i < len; ++i){
+    int isr = is_right[i];
+    if ((isr ? right_head : left_head) < len) {
+      next[isr ? right_head : left_head] = i; // from the head of the left|right list next points to the current index
+    } else {
+      if (isr){ right = i; } else { left = i; }
+    }
+    // move the left or right head to be this particle
+    if (isr){ right_head = i; } else { left_head = i; }
+    next[i] = len + 1; // disconnect this particle from the next list
+  }
 
+  // FIXME since there is only one worker and we don't really care about tl vs tr, this can be simplified.
+  long tl = connect_particle_nodes(&left, next, len, 1, connect_left);
+  long tr = connect_particle_nodes(&right, next, len, 1, connect_right);
 
-
-
-
-
+  if (left_total) *left_total = tl;
+  if (right_total) *right_total = tr;
+  if (left_start) *left_start = left;
+  if (right_start) *right_start = right;
+  return tl + tr;
+}
 
 
 

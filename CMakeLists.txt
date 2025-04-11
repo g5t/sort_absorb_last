@@ -1,24 +1,19 @@
 cmake_minimum_required(VERSION 3.30)
 project(test-sort C)
 set(CMAKE_C_STANDARD 99)
-add_executable(tester main.c sort_absorb_last.c particle.c)
+
+if (${CMAKE_C_COMPILER_ID} STREQUAL "NVHPC")
+    message(STATUS "Using NVIDIA HPC SDK compiler")
+#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -O3")
+    add_compile_options(-acc=multicore)
+else()
+    message(STATUS "Using default compiler ${CMAKE_C_COMPILER_ID}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -O3")
+endif()
+
+add_executable(tester main.c sort_absorb_last.c particle.c particles.c)
 
 include(CTest)
 
-foreach(i RANGE 1 10)
-    add_test(NAME test_sort_offsets_${i} COMMAND tester ${i} 0)
-endforeach ()
-foreach(i RANGE 20 100 10)
-    add_test(NAME test_sort_offsets_${i} COMMAND tester ${i} 0)
-endforeach ()
-foreach(i RANGE 200 1000 100)
-    add_test(NAME test_sort_offsets_${i} COMMAND tester ${i} 0)
-endforeach ()
-foreach(i RANGE 2000 10000 1000)
-    add_test(NAME test_sort_offsets_${i} COMMAND tester ${i} 0)
-endforeach ()
-
-
-#foreach(i RANGE 1 10)
-#    add_test(NAME test_sort_pointers_${i} COMMAND tester ${i} 1)
-#endforeach ()
+add_test(NAME test_sort_offsets_aos COMMAND tester 10000 20000 0)
+add_test(NAME test_sort_offsets_soa COMMAND tester 10000 30000 1)

@@ -13,7 +13,7 @@ struct particle_struct {
   double p;
   double t;
   int _absorbed;
-  double randstate[7];
+  unsigned long randstate[7];
 };
 
 typedef struct particle_struct _class_particle;
