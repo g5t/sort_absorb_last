@@ -5,14 +5,6 @@
 #include "sort_absorb_last.h"
 #define SAL_THREADS 10 // num parallel sections
 
-
-long chunk_start(long len, long threads, long thread){
-  long at_least = len / threads;  // every thread handles at least this many particles
-  long remainder = len % threads; // and the first remainder threads handle one more
-  return thread < remainder ? (at_least + 1) * thread : (at_least + 1) * remainder + at_least * (thread - remainder);
-}
-
-
 long sort_absorb_offset(_class_particle * particles, long * nexts, long len, long * multiplier){
 
   if (multiplier != NULL) *multiplier = -1; // set default out value for multiplier
@@ -27,34 +19,28 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
 
   long good[SAL_THREADS];
   long bad[SAL_THREADS];
+  long last_good[SAL_THREADS];
+  long last_bad[SAL_THREADS];
 
-  long first_index[SAL_THREADS];
-  long first_good[SAL_THREADS];
-  long first_bad[SAL_THREADS];
-
-  // identify per-thread starting points before sorting, since this method breaks once ->next is modified
-  for (long thread = 0; thread < SAL_THREADS; ++thread) {;
-//    first_index[thread] = (at_least + 1) * thread - (thread > remainder ? remainder : 0);
-    first_index[thread] = chunk_start(len, SAL_THREADS, thread);
-    first_good[thread] = len + 1;
-    first_bad[thread] = len + 1;
-    good[thread] = len + 1;
-    bad[thread] = len + 1;
-  }
-
+#pragma acc parallel loop copyin(particles[0:len]) copy(nexts[0:len]) copyout(bad[0:SAL_THREADS], good[0:SAL_THREADS], last_bad[0:SAL_THREADS], last_good[0:SAL_THREADS])
   for (long thread = 0; thread < SAL_THREADS; ++thread) {
     long * cohort;
-    long thread_end = chunk_start(len, SAL_THREADS, thread + 1);
-    for (long i = first_index[thread]; i < thread_end && i < len; ++i) {
+    // initialize list "pointers"
+    good[thread] = bad[thread] = last_good[thread] = last_bad[thread] = len + 1;
+    // identify this thread's range of particles
+    long thread_start = at_least * thread + (thread < remainder ? thread : remainder);
+    long thread_end = thread_start + at_least + (thread < remainder ? 1 : 0);
+    for (long i = thread_start; i < thread_end && i < len; ++i) {
       int absorbed = particles[i]._absorbed;
-      cohort = absorbed ? bad : good;
+      cohort = absorbed ? last_bad : last_good;
       if (cohort[thread] < len){
         nexts[cohort[thread]] = i; // from the head of the good/bad list next to the current node
       } else {
+        // this is the first node in the list, so we need to set the head
         if (absorbed){
-          first_bad[thread] = i;
+          bad[thread] = i;
         } else {
-          first_good[thread] = i;
+          good[thread] = i;
         }
       }
       // update the good/bad list pointer to the current node
@@ -63,14 +49,10 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
       nexts[i] = len + 1;
     }
   }
-  // move the good/bad pointers back to their first entries:
-  for (long thread = 0; thread < SAL_THREADS; ++thread) {
-    good[thread] = first_good[thread];
-    bad[thread] = first_bad[thread];
-  }
-  long total_good = connect_particle_nodes(good, nexts, len, SAL_THREADS, 1);
-  long total_bad = connect_particle_nodes(bad, nexts, len, SAL_THREADS, 0);
-
+  // combine the segments of each list, looping the good list
+  // overwrites the [0] entry of good and bad to point to a valid head node for their respective lists
+  long total_good = connect_particle_nodes(good, last_good, nexts, len, SAL_THREADS, 1);
+  long total_bad = connect_particle_nodes(bad, last_bad, nexts, len, SAL_THREADS, 0);
 
   if (!(total_good && total_bad)){
     return total_good;
@@ -79,7 +61,7 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
     *multiplier = 1 + total_bad / total_good;
   }
   // with finite good and bad, we have work to do.
-  // parallelize over the number of threads, each needs to fill-in total_bad / SAL_THREADS
+  // we will parallelize over the number of threads, each needs to fill-in total_bad / SAL_THREADS
   at_least = total_bad / SAL_THREADS;
   remainder = total_bad % SAL_THREADS;
   // move the pointers to their per-thread offsets
@@ -90,7 +72,7 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
   }
 
   // overwrite the bad list with the good list
-#pragma acc parallel loop present(particles[0:len], bad[0:SAL_THREADS], good[0:SAL_THREADS])
+#pragma acc parallel loop copy(particles[0:len]) copyin(nexts[0:len], bad[0:SAL_THREADS], good[0:SAL_THREADS])
   for (long thread=0; thread < SAL_THREADS; thread++) {
     double randstate[6];
     long chunk = thread < remainder ? at_least + 1 : at_least;

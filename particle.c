@@ -67,7 +67,7 @@ long connect_particle_lists(particle_node ** nodes, long node_count, int loop) {
 }
 
 
-void particle_list_free(particle_node * nodes, long count, int warn){
+void particle_list_free(particle_node * nodes, long count){
   particle_node * next;
   while (nodes != NULL && count > 0) {
     next = nodes->next;
@@ -153,32 +153,34 @@ long particle_node_after(long node, long * nexts, long len, long after) {
 }
 
 
-long connect_particle_nodes(long * nodes, long * nexts, long len, long node_count, int loop) {
+long connect_particle_nodes(long * start_nodes, const long * end_nodes, long * nexts, long len, long node_count, int loop) {
   long first;
-  for (first = 0; first < node_count && nodes[first] >= len; first++);
+  for (first = 0; first < node_count && start_nodes[first] >= len; first++);
   if (first == node_count) {
     // no particles to connect
     return 0;
   }
-  long end = particle_nodes_end(nodes[first], nexts, len);
+//  long end = particle_nodes_end(nodes[first], nexts, len);
+  long end = end_nodes[first];
   for (long next=first + 1; next < node_count; next++) {
-    if (nodes[next] < len){
+    if (start_nodes[next] < len){
       // found a particle, connect it to the list
-      nexts[end] = nodes[next];
+      nexts[end] = start_nodes[next];
       // move the end pointer to the new end
-      end = particle_nodes_end(nexts[end], nexts, len);
+      // end = particle_nodes_end(nexts[end], nexts, len);
+      end = end_nodes[next];
     }
   }
   // nodes[first] now connects all particles in each list, in order,
   // but we want the _first_ node to go through all particles
   if (first){
-    nodes[0] = nodes[first];
+    start_nodes[0] = start_nodes[first];
   }
   // count the number of particles in the list
-  long count = particle_nodes_length(nodes[0], nexts, len);
+  long count = particle_nodes_length(start_nodes[0], nexts, len);
   if (loop){
     // connect the last node to the first
-    nexts[end] = nodes[0];
+    nexts[end] = start_nodes[0];
   }
   return count;
 }
