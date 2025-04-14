@@ -11,12 +11,11 @@ else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -O3")
 endif()
 
-add_executable(tester main.c sort_absorb_last.c particle.c particles.c)
+add_executable(tester main.c sort_absorb_last.c particle.c)
 
 include(CTest)
 
-add_test(NAME test_sort_offsets_soa COMMAND tester 10000 15000 0)
-add_test(NAME test_sort_offsets_aos COMMAND tester 10000 15000 1)
+add_test(NAME test_sort_offsets COMMAND tester 10000 15000)
 
 
-add_executable(stats stats.c sort_absorb_last.c particle.c particles.c)
+add_executable(stats stats.c sort_absorb_last.c particle.c)

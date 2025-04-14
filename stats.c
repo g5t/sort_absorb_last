@@ -2,11 +2,9 @@
 #include <stdlib.h>
 
 #include "particle.h"
-#include "particles.h"
 #include "sort_absorb_last.h"
 
 int particle_stats();
-int particles_stats();
 
 int main(int argc, char *argv[]) {
   if (argc != 1) {
@@ -15,7 +13,6 @@ int main(int argc, char *argv[]) {
   }
 
   particle_stats();
-  particles_stats();
   return 0;
 }
 
@@ -28,15 +25,5 @@ int particle_stats() {
   printf("  per particle size = %ld\n", particle_size);
   printf("  next size = %ld\n", nexts_size);
   printf("  memory for 1024 particles = %ld\n", container_size + 1024 *(particle_size + nexts_size));
-  return 0;
-}
-
-int particles_stats() {
-  long class_size = sizeof(_class_particle_soa);
-  long ppsize = per_particle_size_soa();
-  printf("struct of arrays\n");
-  printf("  sizeof(_class_particle_soa) container = %ld\n", class_size);
-  printf("  required memory per particle = %ld\n", ppsize);
-  printf("  memory for 1024 particles = %ld\n", class_size + ppsize * 1024);
   return 0;
 }
