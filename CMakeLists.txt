@@ -15,5 +15,8 @@ add_executable(tester main.c sort_absorb_last.c particle.c particles.c)
 
 include(CTest)
 
-add_test(NAME test_sort_offsets_aos COMMAND tester 10000 20000 0)
-add_test(NAME test_sort_offsets_soa COMMAND tester 10000 30000 1)
+add_test(NAME test_sort_offsets_soa COMMAND tester 10000 15000 0)
+add_test(NAME test_sort_offsets_aos COMMAND tester 10000 15000 1)
+
+
+add_executable(stats stats.c sort_absorb_last.c particle.c particles.c)

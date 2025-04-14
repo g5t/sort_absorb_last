@@ -1,5 +1,11 @@
 #pragma once
 
+
+/* Particle JUMP control logic */
+struct particle_logic_struct {
+  int dummy;
+};
+
 struct particle_struct {
   double x;
   double y;
@@ -10,10 +16,20 @@ struct particle_struct {
   double sx;
   double sy;
   double sz;
+  double _mctmp_a;
+  double _mctmp_b;
+  double _mctmp_c;
+  unsigned long randstate[7];
   double p;
   double t;
+  long _uid;
+  int _index;
   int _absorbed;
-  unsigned long randstate[7];
+  int _scattered;
+  int _rstore;
+  int flag_noccordschange;
+  int allow_backprop;
+  struct particle_logic_struct * _logic;
 };
 
 typedef struct particle_struct _class_particle;
