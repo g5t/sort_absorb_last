@@ -129,11 +129,12 @@ long particle_nodes_end(long node, long * next_node, long len) {
 }
 
 
+#pragma acc routine seq
 long particle_nodes_length(long node, long * nexts, long len) {
   long count = 0;
   while (node < len) {
     if (count >= len){
-      fprintf(stderr, "Error: particle_nodes_length: node count %ld exceeds length %ld\n", count, len);
+//      fprintf(stderr, "Error: particle_nodes_length: node count %ld exceeds length %ld\n", count, len);
       return count;
     }
     count++;
