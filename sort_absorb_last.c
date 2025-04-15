@@ -22,7 +22,7 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
   long last_good[SAL_THREADS];
   long last_bad[SAL_THREADS];
 
-#pragma acc parallel loop copyin(particles[0:len]) copy(nexts[0:len]) copyout(bad[0:SAL_THREADS], good[0:SAL_THREADS], last_bad[0:SAL_THREADS], last_good[0:SAL_THREADS])
+#pragma acc parallel loop independent pcopyin(particles[0:len]) pcopy(nexts[0:len]) copyout(bad, good, last_bad, last_good)
   for (long thread = 0; thread < SAL_THREADS; ++thread) {
     long * cohort;
     // initialize list "pointers"
@@ -72,18 +72,22 @@ long sort_absorb_offset(_class_particle * particles, long * nexts, long len, lon
   }
 
   // overwrite the bad list with the good list
-#pragma acc parallel loop copy(particles[0:len]) copyin(nexts[0:len], bad[0:SAL_THREADS], good[0:SAL_THREADS])
+  long g;
+  long b;
+#pragma acc parallel loop independent pcopy(particles[0:len]) pcopyin(nexts[0:len], bad, good), private(g, b)
   for (long thread=0; thread < SAL_THREADS; thread++) {
     double randstate[6];
     long chunk = thread < remainder ? at_least + 1 : at_least;
+    g=good[thread];
+    b=bad[thread];
     for (long i=0; i < chunk; ++i){
       // copy the good particle to the bad list but don't copy it's randstate
-      memcpy(randstate, particles[bad[thread]].randstate, sizeof(double) * 6);
-      particles[bad[thread]] = particles[good[thread]];
-      memcpy(particles[bad[thread]].randstate, randstate, sizeof(double) * 6);
+      memcpy(randstate, particles[b].randstate, sizeof(double) * 6);
+      particles[b] = particles[g];
+      memcpy(particles[b].randstate, randstate, sizeof(double) * 6);
       // move the pointers
-      bad[thread] = nexts[bad[thread]];
-      good[thread] = nexts[good[thread]];
+      b = nexts[b];
+      g = nexts[g];
     }
   }
 

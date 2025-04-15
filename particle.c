@@ -153,6 +153,7 @@ long particle_node_after(long node, long * nexts, long len, long after) {
 }
 
 
+#pragma acc routine seq
 long connect_particle_nodes(long * start_nodes, const long * end_nodes, long * nexts, long len, long node_count, int loop) {
   long first;
   for (first = 0; first < node_count && start_nodes[first] >= len; first++);

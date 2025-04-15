@@ -29,11 +29,12 @@ int run_particle_tests(long min, long max){
   long * nexts = calloc(max, sizeof(long));
 
   int result;
+#pragma acc data copy(particles[0:max], nexts[0:max])
   for (long n=min; n<=max; ++n){
     result = run_particle_test(n, particles, nexts);
     if (result != 0) {
       fprintf(stderr, "Error: run_particle_test: failed for n_particles = %ld\n", n);
-      break;
+//      break;
     }
   }
   free(particles);
@@ -41,6 +42,7 @@ int run_particle_tests(long min, long max){
   return result;
 }
 
+#pragma acc routine seq
 int run_particle_test(long n_particles, _class_particle * particles, long * nexts) {
   if (n_particles <= 0) {
     fprintf(stderr, "Error: run_particle_test: n_particles must be > 0\n");
